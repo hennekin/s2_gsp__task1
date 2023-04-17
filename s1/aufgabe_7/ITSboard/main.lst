@@ -1,0 +1,755 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000         ;******************** (C) COPYRIGHT HAW-Hamburg ********
+                       ************************
+    2 00000000         ;* File Name          : main.s
+    3 00000000         ;* Author             : Silke Behn 
+    4 00000000         ;* Version            : V1.0
+    5 00000000         ;* Date               : 01.06.2021
+    6 00000000         ;* Description        : This is a simple main.
+    7 00000000         ;       :
+    8 00000000         ;       : Replace this main with yours.
+    9 00000000         ;
+   10 00000000         ;*******************************************************
+                       ************************
+   11 00000000                 EXTERN           initITSboard
+   12 00000000                 EXTERN           lcdPrintS   ;Display ausgabe
+   13 00000000                 EXTERN           lcdPrintC
+   14 00000000                 EXTERN           lcdPrintlnS
+   15 00000000                 EXTERN           lcdGotoXY
+   16 00000000                 EXTERN           GUI_init
+   17 00000000                 EXTERN           TP_Init
+   18 00000000                 EXTERN           initTimer
+   19 00000000         
+   20 00000000         
+   21 00000000         
+   22 00000000         ;********************************************
+   23 00000000         ; Data section, aligned on 4-byte boundery
+   24 00000000         ;********************************************
+   25 00000000         
+   26 00000000                 AREA             MyData, DATA, align = 2
+   27 00000000         
+   28 00000000         
+   29 00000000 20 03   DEFAULT_BRIGHTNESS
+                               DCW              800
+   30 00000002 30 30 3A 
+              30 30 3A 
+              30 30 00 TXT     DCB              "00:00:00", 0 ; Schreibe Text "
+                                                            Hallo in txt Variab
+                                                            le
+   31 0000000B         
+   32 0000000B         ;Adressen aus der CMSIS
+   33 0000000B         ;\stm32cubef4\Drivers\CMSIS\Device\ST\STM32F4xx\Include\
+                       stm32f429xx.h
+   34 0000000B         
+   35 0000000B         
+   36 0000000B         ; setup the peripherie - Mapping the GPIO
+   37 0000000B 40000000 
+                       PERIPH_BASE
+                               equ              0x40000000
+   38 0000000B 40020000 
+                       AHB1PERIPH_BASE
+                               equ              (PERIPH_BASE + 0x00020000)
+   39 0000000B 40020C00 
+                       GPIO_D_BASE
+                               equ              (AHB1PERIPH_BASE + 0x0C00)
+   40 0000000B 40021000 
+                       GPIO_E_BASE
+                               equ              (AHB1PERIPH_BASE + 0x1000)
+   41 0000000B 40021400 
+                       GPIO_F_BASE
+                               equ              (AHB1PERIPH_BASE + 0x1400)
+
+
+
+ARM Macro Assembler    Page 2 
+
+
+   42 0000000B         
+   43 0000000B 40020C10 
+                       GPIO_D_PIN
+                               equ              (GPIO_D_BASE + 0x10)
+   44 0000000B 40020C18 
+                       GPIO_D_SET
+                               equ              (GPIO_D_BASE + 0x18)
+   45 0000000B 40020C1A 
+                       GPIO_D_CLR
+                               equ              (GPIO_D_BASE + 0x1A)
+   46 0000000B         
+   47 0000000B         
+   48 0000000B 40021410 
+                       GPIO_F_PIN
+                               equ              (GPIO_F_BASE + 0x10)
+   49 0000000B         
+   50 0000000B         
+   51 0000000B 40000000 
+                       APB1PERIPH_BASE
+                               equ              PERIPH_BASE
+   52 0000000B 40000000 
+                       TIM2_BASE
+                               equ              (APB1PERIPH_BASE + 0x0000)
+   53 0000000B         
+   54 0000000B 40000000 
+                       TIM2_CR1
+                               equ              (TIM2_BASE)
+   55 0000000B 40000024 
+                       TIM2_CNT
+                               equ              (TIM2_BASE + 0x24) ; CNT : curr
+                                                            ent time stamp (32 
+                                                            bit),  resolution
+   56 0000000B 40000028 
+                       TIM2_PSC
+                               equ              (TIM2_BASE + 0x28) ; Prescaler 
+                                                             resolution
+   57 0000000B 40000014 
+                       TIM2_EGR
+                               equ              (TIM2_BASE + 0x14) ; 16 Bit reg
+                                                            ister, Bit 0 : 1 Re
+                                                            start Timer 
+   58 0000000B 4000002C 
+                       TIM2_ARR
+                               equ              (TIM2_BASE + 0x2C)
+   59 0000000B         
+   60 0000000B 00000001 
+                       STATE_INIT
+                               equ              1
+   61 0000000B 00000002 
+                       STATE_HOLD
+                               equ              2
+   62 0000000B 00000003 
+                       STATE_RUN
+                               equ              3
+   63 0000000B         
+   64 0000000B 00000001 
+                       LED1    equ              1
+   65 0000000B 00000002 
+                       LED2    equ              2
+
+
+
+ARM Macro Assembler    Page 3 
+
+
+   66 0000000B 00000003 
+                       LED3    equ              3
+   67 0000000B         
+   68 0000000B         
+   69 0000000B         
+   70 0000000B         
+   71 0000000B         ;********************************************
+   72 0000000B         ; Code section, aligned on 8-byte boundery
+   73 0000000B         ;********************************************
+   74 0000000B         
+   75 0000000B                 AREA             |.text|, CODE, READONLY, ALIGN 
+= 3
+   76 00000000         
+   77 00000000         ;--------------------------------------------
+   78 00000000         ; main subroutine
+   79 00000000         ;--------------------------------------------
+   80 00000000                 EXPORT           main [CODE]
+   81 00000000         main    PROC
+   82 00000000 F7FF FFFE       BL               initITSboard
+   83 00000004         
+   84 00000004 F44F 7148       MOV              R1,   #800  ; Helligkeit festle
+                                                            gen und Display ini
+                                                            tialisieren
+   85 00000008 8808            LDRH             R0,   [R1]
+   86 0000000A F7FF FFFE       BL               GUI_init
+   87 0000000E         
+   88 0000000E F04F 0000       MOV              R0,   #0x00 ; ?
+   89 00000012 F7FF FFFE       BL               TP_Init
+   90 00000016         
+   91 00000016 F7FF FFFE       BL               initTimer
+   92 0000001A         
+   93 0000001A F04F 000A       MOV              R0,   #10
+   94 0000001E F04F 010A       MOV              R1,   #10
+   95 00000022 F7FF FFFE       BL               lcdGotoXY
+   96 00000026 4819            LDR              R0,   =TXT  ; Gebe string "Hall
+                                                            o" auf LCD aus
+   97 00000028 F7FF FFFE       BL               lcdPrintS
+   98 0000002C         
+   99 0000002C F04F 0C01       LDR              R12,  =STATE_INIT ; Start State
+                                                             auf Init
+  100 00000030         
+  101 00000030         main_loop
+  102 00000030 4817            LDR              R0,   =GPIO_F_PIN ; einlesen de
+                                                            r Taster
+  103 00000032 7801            LDRB             R1,   [R0]
+  104 00000034         
+  105 00000034         ; LED TASTER TEST
+  106 00000034         ; ldr   R0,   =GPIO_D_CLR
+  107 00000034         ; strb  R1,   [R0]    
+  108 00000034         ; mvn  R1,   R1
+  109 00000034         ; ldr   R0,   =GPIO_D_SET
+  110 00000034         ; strb  R1,   [R0]
+  111 00000034         
+  112 00000034 EA6F 0101       MVN              R1,   R1    ; Switch:: S5: Stat
+                                                            e=1 (init), S6: Sta
+                                                            te=2 (hold), S7: St
+                                                            ate=3 (run), Defaul
+                                                            t: k. verä.
+  113 00000038         if_S5
+
+
+
+ARM Macro Assembler    Page 4 
+
+
+  114 00000038 F011 0F20       TST              R1,   #0x1<<5
+  115 0000003C D001            BEQ              end_if_S5
+  116 0000003E F04F 0C01       LDR              R12,   =STATE_INIT
+  117 00000042         end_if_S5
+  118 00000042         
+  119 00000042         if_S6
+  120 00000042 F011 0F40       TST              R1,   #0x1<<6
+  121 00000046 D001            BEQ              end_if_S6
+  122 00000048 F04F 0C02       LDR              R12,   =STATE_HOLD
+  123 0000004C         end_if_S6
+  124 0000004C         
+  125 0000004C         if_S7
+  126 0000004C F011 0F80       TST              R1,   #0x1<<7
+  127 00000050 D001            BEQ              end_if_S7
+  128 00000052 F04F 0C03       LDR              R12,   =STATE_RUN
+  129 00000056         end_if_S7
+  130 00000056         
+  131 00000056 F1BC 0F02       CMP              R12,   #2   ; Rufe richtiges Un
+                                                            terprogramm auf: ST
+                                                            ATE < 2 => INIT, ST
+                                                            ATE = 2 => HOLD, ST
+                                                            ATE > 2 => RUN
+  132 0000005A D301            BLO              state_init
+  133 0000005C D005            BEQ              state_hold
+  134 0000005E D809            BHI              state_run
+  135 00000060         
+  136 00000060         state_init
+  137 00000060 480C            LDR              R0,   =GPIO_D_CLR ; Keine led l
+                                                            euchten lassen
+  138 00000062 F04F 01FF       MOV              R1,   #0xFF
+  139 00000066 7001            STRB             R1,   [R0]
+  140 00000068 E7E2            B                main_loop
+  141 0000006A         ; Setze gestoppte Zeitspanne auf 0
+  142 0000006A         
+  143 0000006A         state_hold
+  144 0000006A 480B            LDR              R0,   =GPIO_D_SET ; D8 u D9 leu
+                                                            chten lassen
+  145 0000006C F04F 0103       MOV              R1,   #0x3
+  146 00000070 7001            STRB             R1,   [R0]
+  147 00000072 E7DD            B                main_loop
+  148 00000074         ; Akt Zeit abspeichern
+  149 00000074         
+  150 00000074         state_run
+  151 00000074 4808            LDR              R0,   =GPIO_D_SET ; Nur D8 leuc
+                                                            hten lassen
+  152 00000076 F04F 0101       MOV              R1,   #0x1
+  153 0000007A 7001            STRB             R1,   [R0]
+  154 0000007C 4805            LDR              R0,   =GPIO_D_CLR
+  155 0000007E F04F 0102       MOV              R1,   #0x2
+  156 00000082 7001            STRB             R1,   [R0]
+  157 00000084 E7D4            B                main_loop
+  158 00000086         
+  159 00000086         ; Aktualisieren Zeitspanne
+  160 00000086         
+  161 00000086         update_time                          ; Udiff nachgoogeln
+                                                            
+  162 00000086         
+  163 00000086         update_leds
+                               PROC
+
+
+
+ARM Macro Assembler    Page 5 
+
+
+  164 00000086 B503            push             {R0, R1, LR}
+  165 00000088         
+  166 00000088 BD03            pop              {R0, R1, PC}
+  167 0000008A                 ENDP
+  168 0000008A         
+  169 0000008A         update_tft
+  170 0000008A         
+  171 0000008A         
+  172 0000008A E7D1            b                main_loop
+  173 0000008C                 ENDP
+  174 0000008C         
+  175 0000008C                 ALIGN
+  176 0000008C                 END
+              00000000 
+              40021410 
+              40020C1A 
+              40020C18 
+Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M4.fp.sp --depen
+d=.\itsboard\main_1.d -o.\itsboard\main_1.o -I.\RTE\_ITSboard_Assembler -IC:\Us
+ers\Henne\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include -IC:\Users
+\Henne\AppData\Local\Arm\Packs\Keil\STM32F4xx_DFP\2.16.0\Drivers\CMSIS\Device\S
+T\STM32F4xx\Include --predefine="__EVAL SETA 1" --predefine="__MICROLIB SETA 1"
+ --predefine="__UVISION_VERSION SETA 537" --predefine="_RTE_ SETA 1" --predefin
+e="STM32F429xx SETA 1" --predefine="_RTE_ SETA 1" --list=.\itsboard\main.lst ma
+in.s
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+DEFAULT_BRIGHTNESS 00000000
+
+Symbol: DEFAULT_BRIGHTNESS
+   Definitions
+      At line 29 in file main.s
+   Uses
+      None
+Comment: DEFAULT_BRIGHTNESS unused
+MyData 00000000
+
+Symbol: MyData
+   Definitions
+      At line 26 in file main.s
+   Uses
+      None
+Comment: MyData unused
+TXT 00000002
+
+Symbol: TXT
+   Definitions
+      At line 30 in file main.s
+   Uses
+      At line 96 in file main.s
+Comment: TXT used once
+3 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+.text 00000000
+
+Symbol: .text
+   Definitions
+      At line 75 in file main.s
+   Uses
+      None
+Comment: .text unused
+end_if_S5 00000042
+
+Symbol: end_if_S5
+   Definitions
+      At line 117 in file main.s
+   Uses
+      At line 115 in file main.s
+Comment: end_if_S5 used once
+end_if_S6 0000004C
+
+Symbol: end_if_S6
+   Definitions
+      At line 123 in file main.s
+   Uses
+      At line 121 in file main.s
+Comment: end_if_S6 used once
+end_if_S7 00000056
+
+Symbol: end_if_S7
+   Definitions
+      At line 129 in file main.s
+   Uses
+      At line 127 in file main.s
+Comment: end_if_S7 used once
+if_S5 00000038
+
+Symbol: if_S5
+   Definitions
+      At line 113 in file main.s
+   Uses
+      None
+Comment: if_S5 unused
+if_S6 00000042
+
+Symbol: if_S6
+   Definitions
+      At line 119 in file main.s
+   Uses
+      None
+Comment: if_S6 unused
+if_S7 0000004C
+
+Symbol: if_S7
+   Definitions
+      At line 125 in file main.s
+   Uses
+      None
+Comment: if_S7 unused
+main 00000000
+
+Symbol: main
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Relocatable symbols
+
+   Definitions
+      At line 81 in file main.s
+   Uses
+      At line 80 in file main.s
+Comment: main used once
+main_loop 00000030
+
+Symbol: main_loop
+   Definitions
+      At line 101 in file main.s
+   Uses
+      At line 140 in file main.s
+      At line 147 in file main.s
+      At line 157 in file main.s
+      At line 172 in file main.s
+
+state_hold 0000006A
+
+Symbol: state_hold
+   Definitions
+      At line 143 in file main.s
+   Uses
+      At line 133 in file main.s
+Comment: state_hold used once
+state_init 00000060
+
+Symbol: state_init
+   Definitions
+      At line 136 in file main.s
+   Uses
+      At line 132 in file main.s
+Comment: state_init used once
+state_run 00000074
+
+Symbol: state_run
+   Definitions
+      At line 150 in file main.s
+   Uses
+      At line 134 in file main.s
+Comment: state_run used once
+update_leds 00000086
+
+Symbol: update_leds
+   Definitions
+      At line 163 in file main.s
+   Uses
+      None
+Comment: update_leds unused
+update_tft 0000008A
+
+Symbol: update_tft
+   Definitions
+      At line 169 in file main.s
+   Uses
+      None
+Comment: update_tft unused
+update_time 00000086
+
+Symbol: update_time
+
+
+
+ARM Macro Assembler    Page 3 Alphabetic symbol ordering
+Relocatable symbols
+
+   Definitions
+      At line 161 in file main.s
+   Uses
+      None
+Comment: update_time unused
+15 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Absolute symbols
+
+AHB1PERIPH_BASE 40020000
+
+Symbol: AHB1PERIPH_BASE
+   Definitions
+      At line 38 in file main.s
+   Uses
+      At line 39 in file main.s
+      At line 40 in file main.s
+      At line 41 in file main.s
+
+APB1PERIPH_BASE 40000000
+
+Symbol: APB1PERIPH_BASE
+   Definitions
+      At line 51 in file main.s
+   Uses
+      At line 52 in file main.s
+Comment: APB1PERIPH_BASE used once
+GPIO_D_BASE 40020C00
+
+Symbol: GPIO_D_BASE
+   Definitions
+      At line 39 in file main.s
+   Uses
+      At line 43 in file main.s
+      At line 44 in file main.s
+      At line 45 in file main.s
+
+GPIO_D_CLR 40020C1A
+
+Symbol: GPIO_D_CLR
+   Definitions
+      At line 45 in file main.s
+   Uses
+      At line 137 in file main.s
+      At line 154 in file main.s
+
+GPIO_D_PIN 40020C10
+
+Symbol: GPIO_D_PIN
+   Definitions
+      At line 43 in file main.s
+   Uses
+      None
+Comment: GPIO_D_PIN unused
+GPIO_D_SET 40020C18
+
+Symbol: GPIO_D_SET
+   Definitions
+      At line 44 in file main.s
+   Uses
+      At line 144 in file main.s
+      At line 151 in file main.s
+
+GPIO_E_BASE 40021000
+
+Symbol: GPIO_E_BASE
+   Definitions
+      At line 40 in file main.s
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Absolute symbols
+
+   Uses
+      None
+Comment: GPIO_E_BASE unused
+GPIO_F_BASE 40021400
+
+Symbol: GPIO_F_BASE
+   Definitions
+      At line 41 in file main.s
+   Uses
+      At line 48 in file main.s
+Comment: GPIO_F_BASE used once
+GPIO_F_PIN 40021410
+
+Symbol: GPIO_F_PIN
+   Definitions
+      At line 48 in file main.s
+   Uses
+      At line 102 in file main.s
+Comment: GPIO_F_PIN used once
+LED1 00000001
+
+Symbol: LED1
+   Definitions
+      At line 64 in file main.s
+   Uses
+      None
+Comment: LED1 unused
+LED2 00000002
+
+Symbol: LED2
+   Definitions
+      At line 65 in file main.s
+   Uses
+      None
+Comment: LED2 unused
+LED3 00000003
+
+Symbol: LED3
+   Definitions
+      At line 66 in file main.s
+   Uses
+      None
+Comment: LED3 unused
+PERIPH_BASE 40000000
+
+Symbol: PERIPH_BASE
+   Definitions
+      At line 37 in file main.s
+   Uses
+      At line 38 in file main.s
+      At line 51 in file main.s
+
+STATE_HOLD 00000002
+
+Symbol: STATE_HOLD
+   Definitions
+      At line 61 in file main.s
+   Uses
+      At line 122 in file main.s
+
+
+
+ARM Macro Assembler    Page 3 Alphabetic symbol ordering
+Absolute symbols
+
+Comment: STATE_HOLD used once
+STATE_INIT 00000001
+
+Symbol: STATE_INIT
+   Definitions
+      At line 60 in file main.s
+   Uses
+      At line 99 in file main.s
+      At line 116 in file main.s
+
+STATE_RUN 00000003
+
+Symbol: STATE_RUN
+   Definitions
+      At line 62 in file main.s
+   Uses
+      At line 128 in file main.s
+Comment: STATE_RUN used once
+TIM2_ARR 4000002C
+
+Symbol: TIM2_ARR
+   Definitions
+      At line 58 in file main.s
+   Uses
+      None
+Comment: TIM2_ARR unused
+TIM2_BASE 40000000
+
+Symbol: TIM2_BASE
+   Definitions
+      At line 52 in file main.s
+   Uses
+      At line 54 in file main.s
+      At line 55 in file main.s
+      At line 56 in file main.s
+      At line 57 in file main.s
+      At line 58 in file main.s
+
+TIM2_CNT 40000024
+
+Symbol: TIM2_CNT
+   Definitions
+      At line 55 in file main.s
+   Uses
+      None
+Comment: TIM2_CNT unused
+TIM2_CR1 40000000
+
+Symbol: TIM2_CR1
+   Definitions
+      At line 54 in file main.s
+   Uses
+      None
+Comment: TIM2_CR1 unused
+TIM2_EGR 40000014
+
+Symbol: TIM2_EGR
+   Definitions
+      At line 57 in file main.s
+
+
+
+ARM Macro Assembler    Page 4 Alphabetic symbol ordering
+Absolute symbols
+
+   Uses
+      None
+Comment: TIM2_EGR unused
+TIM2_PSC 40000028
+
+Symbol: TIM2_PSC
+   Definitions
+      At line 56 in file main.s
+   Uses
+      None
+Comment: TIM2_PSC unused
+22 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+External symbols
+
+GUI_init 00000000
+
+Symbol: GUI_init
+   Definitions
+      At line 16 in file main.s
+   Uses
+      At line 86 in file main.s
+Comment: GUI_init used once
+TP_Init 00000000
+
+Symbol: TP_Init
+   Definitions
+      At line 17 in file main.s
+   Uses
+      At line 89 in file main.s
+Comment: TP_Init used once
+initITSboard 00000000
+
+Symbol: initITSboard
+   Definitions
+      At line 11 in file main.s
+   Uses
+      At line 82 in file main.s
+Comment: initITSboard used once
+initTimer 00000000
+
+Symbol: initTimer
+   Definitions
+      At line 18 in file main.s
+   Uses
+      At line 91 in file main.s
+Comment: initTimer used once
+lcdGotoXY 00000000
+
+Symbol: lcdGotoXY
+   Definitions
+      At line 15 in file main.s
+   Uses
+      At line 95 in file main.s
+Comment: lcdGotoXY used once
+lcdPrintC 00000000
+
+Symbol: lcdPrintC
+   Definitions
+      At line 13 in file main.s
+   Uses
+      None
+Comment: lcdPrintC unused
+lcdPrintS 00000000
+
+Symbol: lcdPrintS
+   Definitions
+      At line 12 in file main.s
+   Uses
+      At line 97 in file main.s
+Comment: lcdPrintS used once
+lcdPrintlnS 00000000
+
+Symbol: lcdPrintlnS
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+External symbols
+
+   Definitions
+      At line 14 in file main.s
+   Uses
+      None
+Comment: lcdPrintlnS unused
+8 symbols
+386 symbols in table
