@@ -47,7 +47,7 @@ int main(void){
 	
 	int32_t error = 0;
 	int32_t inputNum = 0;
-	bool newInput;
+	char command = 0;
 	
   Terminal keyPadTerm = makeKeyPad();	//	neues Keypad erzeugen
 	
@@ -59,13 +59,11 @@ int main(void){
 	
     while (true) 
 	{
-		error = addZiffer(&inputNum, &keyPadTerm, &newInput);
+		error = getInput(&inputNum, &command);
 		errorHandling(error, &keyPadTerm);
 		
-		// opations
-		
-		// output
-		
+		//error = rechnung();
+		//errorHandling(error, &keyPadTerm);
 	}
 	
 }

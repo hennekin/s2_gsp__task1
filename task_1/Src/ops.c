@@ -18,6 +18,93 @@
 #include "terminal.h"
 
 /**
+  * @brief  Prueft, ob ein Zeichen oder eine Nummer eingetippt wurde. 
+  * Wenn eine Nummer eingetippt wird: Konstruiert int Nummer.
+  * Wenn Zeichen eingetippt wurde: Rufe entsprechende Operation auf.
+  * @param  
+  * @retval None
+  */
+int32_t addZiffer (int32_t* inputNumP, Terminal* keyPadTermP, bool* newInputP)
+{
+	int32_t error = 0;
+	char c = 0;
+	int32_t value = 0;
+	char charArray[2];
+	
+	error = getInput(&c);
+	if (error) return error; 
+	
+	if ('0' <= c && '9' >= c)
+	{
+		value = c - '0';
+			
+		charArray[0] = c;					
+		charArray[1] = '\0';
+		printTerm(charArray, keyPadTermP);
+			
+		if ((INT32_MAX - *inputNumP *10 - value) < 0)
+		{
+			return -1;
+		}
+		
+		*inputNumP *= 10;
+		*inputNumP += value;
+	}
+	else
+	{
+		if (*newInputP)	return -50;													// error code fixen
+		
+		clearTerm(keyPadTermP);
+		switch(c)
+		{
+			case 'C':
+				clearOp();
+				break;
+			case 'p':
+				error = printOne(keyPadTermP);
+				if (error) return error; 
+				break;
+			case 'P':
+				error = printAll(keyPadTermP);
+				if (error) return error;
+				break;
+			case '+':
+				error = sumOp();
+				if (error) return error;
+				break;
+			case '-':
+				error = subOp();
+				if (error) return error;
+				break;
+			case '*':
+				error = mulOp();
+				if (error) return error;
+				break;
+			case '/':
+				error = divOp();
+				if (error) return error;
+				break;
+			case 'd':
+				error = doubleOp();
+				if (error) return error;
+				break;
+			case 'r':
+				error = reverseOp();
+				if (error) return error;
+				break;
+			case 'e':
+			case '#':
+			case ' ':
+				error = enterOp(*inputNumP);
+				if (error) return error; 
+				break;
+		}
+		*inputNumP = 0;
+	}
+	return 0;
+}
+
+/**
   * @brief Resettet den Taschenrechner
   * @param  
   * @retval None

@@ -33,4 +33,6 @@ int32_t doubleOp();
 int32_t reverseOp();
 
 int32_t enterOp(int32_t number);
+
+int32_t addZiffer(int32_t* inputNumP, Terminal* keyPadTerm, bool* newInputP);
  

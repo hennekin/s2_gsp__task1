@@ -13,7 +13,5 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "keypad.h"
- 
-int32_t addZiffer(int32_t* inputNumP, Terminal* keyPadTerm, bool* newInputP);
 
-int32_t getInput (char* c);
+int32_t getInput (int* inputNumP, char* command);
